@@ -1,0 +1,298 @@
+/**
+ * The generation screen (TASK §6.1), shared by the popup and the full-size
+ * editor page. A popup is capped at roughly 800x600, which is cramped once the
+ * vacancy, the controls and the letter are all on screen, so the same component
+ * renders in a roomier layout on editor.html.
+ */
+
+import { useCallback, useEffect, useState } from 'react';
+import { STRINGS } from '../config/strings';
+import {
+  LANGUAGE_LABELS,
+  LENGTH_PRESETS,
+  LETTER_LANGUAGES,
+  LETTER_LENGTHS,
+  type LetterLanguage,
+  type LetterLength,
+} from '../config/lengths';
+import { isAppErrorShape } from '../lib/errors';
+import { countWords } from '../lib/sanitizer';
+import { sendMessage } from '../background/messages';
+import { activeConfig, saveSettings } from '../storage/settings';
+import { takePendingVacancy } from '../storage/generation';
+import { useFlash, useGenerationState, useSettings } from './hooks';
+import { Segmented } from './components/Segmented';
+
+const LANGUAGE_OPTIONS = LETTER_LANGUAGES.map((value) => ({
+  value,
+  label: LANGUAGE_LABELS[value],
+}));
+
+const LENGTH_OPTIONS = LETTER_LENGTHS.map((value) => ({
+  value,
+  label: LENGTH_PRESETS[value].label,
+}));
+
+const openOptions = (): void => {
+  void chrome.runtime.openOptionsPage();
+};
+const openStats = (): void => {
+  void chrome.tabs.create({ url: chrome.runtime.getURL('stats.html') });
+};
+
+interface Props {
+  /** The popup gets a compact layout and an "open in a window" button. */
+  variant: 'popup' | 'editor';
+}
+
+export const GenerationView = ({ variant }: Props) => {
+  const { settings, loaded: settingsLoaded } = useSettings();
+  const { state, loaded: stateLoaded } = useGenerationState();
+  const [copied, flashCopied] = useFlash();
+
+  const [vacancyText, setVacancyText] = useState('');
+  const [userPrompt, setUserPrompt] = useState('');
+  const [language, setLanguage] = useState<LetterLanguage>('auto');
+  const [length, setLength] = useState<LetterLength>('medium');
+  const [letter, setLetter] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Restore the last defaults once settings arrive.
+  const [defaultsApplied, setDefaultsApplied] = useState(false);
+  useEffect(() => {
+    if (!settingsLoaded || defaultsApplied) return;
+    setLanguage(settings.defaults.language);
+    setLength(settings.defaults.length);
+    setDefaultsApplied(true);
+  }, [settingsLoaded, defaultsApplied, settings.defaults]);
+
+  // Restore whatever the service worker is holding: a request that outlived a
+  // closed popup, or a finished letter the user has not seen yet.
+  const [stateApplied, setStateApplied] = useState(false);
+  useEffect(() => {
+    if (!stateLoaded || stateApplied) return;
+    if (state.input) {
+      setVacancyText(state.input.vacancyText);
+      setUserPrompt(state.input.userPrompt);
+      setLanguage(state.input.language);
+      setLength(state.input.length);
+    }
+    setStateApplied(true);
+  }, [stateLoaded, stateApplied, state.input]);
+
+  // Text picked up from the context menu wins over the restored input.
+  useEffect(() => {
+    void takePendingVacancy().then((pending) => {
+      if (pending) setVacancyText(pending);
+    });
+  }, []);
+
+  // Follow the worker's result, including edits made in the other window.
+  useEffect(() => {
+    if (state.status === 'done' && state.result) setLetter(state.result.letter);
+    if (state.status === 'idle') setLetter('');
+  }, [state.status, state.result]);
+
+  const isRunning = state.status === 'running';
+  const ready = activeConfig(settings) !== null;
+  const hasCv = settings.cvText.trim().length > 0;
+  const requirements = state.result?.companyRequirements;
+  const onlyPhrase = requirements?.mode === 'only_phrase';
+
+  const persistDefaults = useCallback(
+    (next: { language?: LetterLanguage; length?: LetterLength }) => {
+      void saveSettings({
+        defaults: {
+          language: next.language ?? language,
+          length: next.length ?? length,
+        },
+      });
+    },
+    [language, length],
+  );
+
+  const generate = useCallback(async () => {
+    const text = vacancyText.trim();
+    if (!text) {
+      setFormError(STRINGS.generation.emptyVacancy);
+      return;
+    }
+    setFormError(null);
+
+    try {
+      await sendMessage({
+        type: 'generate',
+        input: { vacancyText: text, language, length, userPrompt },
+      });
+    } catch (error) {
+      setFormError(isAppErrorShape(error) ? error.message : STRINGS.common.loading);
+    }
+  }, [vacancyText, language, length, userPrompt]);
+
+  const regenerate = useCallback(async () => {
+    await sendMessage({ type: 'resetGeneration' });
+    await generate();
+  }, [generate]);
+
+  const copy = useCallback(() => {
+    void navigator.clipboard.writeText(letter).then(() => flashCopied(STRINGS.generation.copied));
+  }, [letter, flashCopied]);
+
+  const persistLetter = useCallback(() => {
+    if (state.status !== 'done' || letter === state.result?.letter) return;
+    void sendMessage({ type: 'updateLetter', letter });
+  }, [letter, state.status, state.result]);
+
+  const openEditor = useCallback(() => {
+    void chrome.tabs.create({ url: chrome.runtime.getURL('editor.html') });
+  }, []);
+
+  if (!settingsLoaded) return <p className="hint">{STRINGS.common.loading}</p>;
+
+  return (
+    <div className={`stack generation generation-${variant}`}>
+      {!ready && (
+        <div className="notice">
+          <strong>Нужна настройка</strong>
+          Выберите провайдера и введите API-ключ.{' '}
+          <button type="button" className="ghost" onClick={openOptions}>
+            Открыть настройки
+          </button>
+        </div>
+      )}
+
+      {ready && !hasCv && (
+        <div className="notice">
+          <strong>{STRINGS.cv.empty}</strong>
+          {STRINGS.cv.emptyHint}{' '}
+          <button type="button" className="ghost" onClick={openOptions}>
+            Добавить CV
+          </button>
+        </div>
+      )}
+
+      <div className="stack-sm">
+        <div className="row-between">
+          <label htmlFor="vacancy">{STRINGS.generation.vacancyLabel}</label>
+          {variant === 'popup' && (
+            <button type="button" className="ghost icon" onClick={openEditor}>
+              ⤢ {STRINGS.generation.expand}
+            </button>
+          )}
+        </div>
+        <textarea
+          id="vacancy"
+          rows={variant === 'popup' ? 5 : 12}
+          placeholder={STRINGS.generation.vacancyPlaceholder}
+          value={vacancyText}
+          onChange={(e) => setVacancyText(e.target.value)}
+        />
+      </div>
+
+      <div className="controls">
+        <div className="stack-sm">
+          <span className="label">{STRINGS.generation.languageLabel}</span>
+          <Segmented
+            options={LANGUAGE_OPTIONS}
+            value={language}
+            ariaLabel={STRINGS.generation.languageLabel}
+            onChange={(next) => {
+              setLanguage(next);
+              persistDefaults({ language: next });
+            }}
+          />
+        </div>
+        <div className="stack-sm">
+          <span className="label">{STRINGS.generation.lengthLabel}</span>
+          <Segmented
+            options={LENGTH_OPTIONS}
+            value={length}
+            ariaLabel={STRINGS.generation.lengthLabel}
+            onChange={(next) => {
+              setLength(next);
+              persistDefaults({ length: next });
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="stack-sm">
+        <label htmlFor="user-prompt">{STRINGS.generation.userPromptLabel}</label>
+        <textarea
+          id="user-prompt"
+          rows={2}
+          placeholder={STRINGS.generation.userPromptPlaceholder}
+          value={userPrompt}
+          onChange={(e) => setUserPrompt(e.target.value)}
+        />
+      </div>
+
+      <div className="row">
+        <button
+          type="button"
+          className="primary"
+          disabled={isRunning || !ready || !hasCv}
+          onClick={() => void generate()}
+        >
+          {isRunning ? (
+            <span className="row">
+              <span className="spinner" /> {STRINGS.generation.generating}
+            </span>
+          ) : (
+            STRINGS.generation.generate
+          )}
+        </button>
+        <span className="spacer" />
+        <button type="button" className="ghost icon" onClick={openStats}>
+          {STRINGS.common.stats}
+        </button>
+        <button type="button" className="ghost icon" onClick={openOptions}>
+          {STRINGS.common.settings}
+        </button>
+      </div>
+
+      {formError && <p className="error">{formError}</p>}
+      {state.status === 'error' && state.error && <p className="error">{state.error.message}</p>}
+
+      {requirements?.found && requirements.description && (
+        <div className="notice">
+          <strong>⚠ {STRINGS.generation.companyRequirements}</strong>
+          {requirements.description}
+          {onlyPhrase && <p className="hint">{STRINGS.generation.onlyPhraseNote}</p>}
+        </div>
+      )}
+
+      {state.status === 'done' && state.result && (
+        <div className="stack-sm">
+          <div className="row-between">
+            <label htmlFor="letter">{STRINGS.generation.resultLabel}</label>
+            <span className="hint">{STRINGS.cv.wordCount(countWords(letter))}</span>
+          </div>
+          <textarea
+            id="letter"
+            rows={variant === 'popup' ? 8 : 14}
+            value={letter}
+            onChange={(e) => setLetter(e.target.value)}
+            onBlur={persistLetter}
+          />
+          <div className="row">
+            <button type="button" onClick={copy}>
+              {copied ?? STRINGS.generation.copy}
+            </button>
+            <button type="button" disabled={isRunning} onClick={() => void regenerate()}>
+              {STRINGS.generation.regenerate}
+            </button>
+            <span className="spacer" />
+            <span className="hint">
+              {state.result.vacancyId === null
+                ? STRINGS.generation.notSaved
+                : state.result.createdNew
+                  ? STRINGS.generation.savedNew
+                  : STRINGS.generation.savedUpdated}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

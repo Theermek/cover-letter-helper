@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "AI Cover Letter Assistant",
+  "version": "0.1.0",
+  "description": "Живое сопроводительное письмо по вакансии и вашему CV плюс статистика требований рынка. Все данные хранятся локально.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "AI Cover Letter Assistant"
+  },
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "unlimitedStorage"
+  ],
+  "host_permissions": [
+    "https://api.openai.com/*",
+    "https://api.anthropic.com/*",
+    "https://generativelanguage.googleapis.com/*"
+  ]
+}
