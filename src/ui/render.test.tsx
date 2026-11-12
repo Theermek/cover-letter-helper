@@ -19,12 +19,19 @@ const configured: Settings = {
   models: { openai: 'gpt-4.1-mini' },
   fetchedModels: {},
   cvText: 'Три года React и TypeScript, админка для логистики.',
+  signature: { enabled: false, ru: 'С уважением, Эрмек', en: 'Best regards, Ermek' },
   defaults: { language: 'ru', length: 'medium' },
 };
 
 const doneState: GenerationState = {
   status: 'done',
-  input: { vacancyText: 'Ищем фронтендера', language: 'ru', length: 'medium', userPrompt: '' },
+  input: {
+    vacancyText: 'Ищем фронтендера',
+    language: 'ru',
+    length: 'medium',
+    userPrompt: '',
+    withSignature: false,
+  },
   result: {
     letter: 'Здравствуйте! Делал похожие админки на React.',
     companyRequirements: {

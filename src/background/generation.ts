@@ -10,6 +10,7 @@ import { buildSystemPrompt } from '../prompts/system';
 import { buildUserPrompt } from '../prompts/buildUserPrompt';
 import { AppError, appError, toAppError } from '../lib/errors';
 import { sanitizeLetter } from '../lib/sanitizer';
+import { appendSignature, resolveSignature } from '../lib/signature';
 import { vacancyTextHash } from '../lib/hash';
 import { activeConfig, getSettings } from '../storage/settings';
 import { getVacancy, upsertVacancy } from '../storage/db';
@@ -75,13 +76,14 @@ const run = async (input: GenerationInput): Promise<GenerationState> => {
 
     const provider = getProvider(config.provider);
     const params = {
-      system: buildSystemPrompt(),
+      system: buildSystemPrompt({ withSignature: input.withSignature }),
       user: buildUserPrompt({
         vacancyText,
         cvText: settings.cvText,
         language: input.language,
         length: input.length,
         userPrompt: input.userPrompt,
+        withSignature: input.withSignature,
       }),
       model: config.model,
       apiKey: config.apiKey,
@@ -97,7 +99,17 @@ const run = async (input: GenerationInput): Promise<GenerationState> => {
       parsed = await provider.generate(params);
     }
 
-    const letter = finalizeLetter(parsed);
+    // The signature goes on after the sanitizer and before storage, so the
+    // field, the clipboard and the saved record all hold the same text. Never
+    // in only_phrase mode: the company asked for the code word and nothing else.
+    const sanitized = finalizeLetter(parsed);
+    const letter =
+      input.withSignature && parsed.companyRequirements.mode !== 'only_phrase'
+        ? appendSignature(
+            sanitized,
+            resolveSignature(settings.signature, input.language, sanitized),
+          )
+        : sanitized;
 
     let vacancyId: string | null = null;
     let createdNew = false;

@@ -358,6 +358,22 @@ body.page-body {
   padding: 0;
 }
 
+/* Inline checkbox that sits in a row of buttons without stretching it. */
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.check input {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+}
+
 /* --- contacts -------------------------------------------------------- */
 
 .contacts > summary {

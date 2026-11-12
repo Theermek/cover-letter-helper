@@ -14,6 +14,8 @@ export interface GenerationRequest {
   length: LetterLength;
   /** Free-text wishes from the popup; optional. */
   userPrompt: string;
+  /** When true the letter must end without a signature; code appends it. */
+  withSignature: boolean;
 }
 
 const LANGUAGE_INSTRUCTION: Readonly<Record<LetterLanguage, string>> = {
@@ -29,7 +31,11 @@ export const buildUserPrompt = (request: GenerationRequest): string => {
   const sections = [
     `# ТЕКСТ ВАКАНСИИ\n"""\n${request.vacancyText.trim()}\n"""`,
     `# CV СОИСКАТЕЛЯ\nЕдинственный источник фактов о соискателе. Всё, чего здесь нет, не существует.\n"""\n${request.cvText.trim()}\n"""`,
-    `# НАСТРОЙКИ (приоритет 4)\nЯзык письма: ${LANGUAGE_INSTRUCTION[request.language]}.\nДлина: ${preset.label}, ориентир ${preset.minWords}-${preset.maxWords} слов.`,
+    `# НАСТРОЙКИ (приоритет 4)\nЯзык письма: ${LANGUAGE_INSTRUCTION[request.language]}.\nДлина: ${preset.label}, ориентир ${preset.minWords}-${preset.maxWords} слов.${
+      request.withSignature
+        ? '\nПодпись: не пиши. Ни прощания, ни имени, ни контактов в конце - их добавит код после тебя.'
+        : ''
+    }`,
   ];
 
   sections.push(

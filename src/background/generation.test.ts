@@ -29,6 +29,7 @@ const settings = {
   models: { openai: 'gpt-4.1-mini' },
   fetchedModels: {},
   cvText: 'React, TypeScript, три года.',
+  signature: { enabled: false, ru: 'С уважением, Эрмек', en: 'Best regards, Ermek' },
   defaults: { language: 'ru', length: 'medium' },
 };
 
@@ -48,6 +49,7 @@ const input = (over: Partial<GenerationInput> = {}): GenerationInput => ({
   language: 'ru',
   length: 'medium',
   userPrompt: '',
+  withSignature: false,
   ...over,
 });
 
@@ -165,6 +167,71 @@ describe('startGeneration', () => {
 
     expect(generate).not.toHaveBeenCalled();
     expect(state.status).toBe('error');
+  });
+
+  it('appends the signature once, however many times the letter is regenerated', async () => {
+    generate.mockResolvedValue(response({ letter: 'Здравствуйте! Делал админки на React.' }));
+    const { startGeneration } = await import('./generation');
+
+    const first = await startGeneration(input({ withSignature: true }));
+    const second = await startGeneration(input({ withSignature: true }));
+
+    expect(first.result?.letter).toBe('Здравствуйте! Делал админки на React.\n\nС уважением, Эрмек');
+    expect(second.result?.letter).toBe(first.result?.letter);
+  });
+
+  it('picks the signature template by the language of the letter when set to auto', async () => {
+    generate.mockResolvedValue(response({ letter: 'Hi, I saw your backend opening.' }));
+    const { startGeneration } = await import('./generation');
+
+    const state = await startGeneration(input({ language: 'auto', withSignature: true }));
+
+    expect(state.result?.letter.endsWith('Best regards, Ermek')).toBe(true);
+  });
+
+  it('adds no signature when the company asked for the code word alone', async () => {
+    generate.mockResolvedValue(
+      response({
+        letter: 'Здравствуйте! Хочу откликнуться...',
+        companyRequirements: {
+          found: true,
+          mode: 'only_phrase',
+          phrase: 'Банан',
+          description: 'напишите только слово Банан',
+        },
+      }),
+    );
+    const { startGeneration } = await import('./generation');
+
+    const state = await startGeneration(input({ withSignature: true }));
+
+    expect(state.result?.letter).toBe('Банан');
+  });
+
+  it('leaves the letter alone when the checkbox is off', async () => {
+    generate.mockResolvedValue(response({ letter: 'Здравствуйте! Делал админки на React.' }));
+    const { startGeneration } = await import('./generation');
+
+    const state = await startGeneration(input({ withSignature: false }));
+
+    expect(state.result?.letter).toBe('Здравствуйте! Делал админки на React.');
+  });
+
+  it('tells the model not to sign only when the signature is switched on', async () => {
+    generate.mockResolvedValue(response());
+    const { startGeneration } = await import('./generation');
+
+    await startGeneration(input({ withSignature: true }));
+    const withOn = generate.mock.calls[0]?.[0] as { system: string; user: string };
+    expect(withOn.system).toContain('подпись, прощание и своё имя в конце НЕ пиши');
+    expect(withOn.user).toContain('Подпись: не пиши');
+
+    vi.clearAllMocks();
+    generate.mockResolvedValue(response());
+    await startGeneration(input({ withSignature: false }));
+    const withOff = generate.mock.calls[0]?.[0] as { system: string; user: string };
+    expect(withOff.system).not.toContain('НЕ пиши');
+    expect(withOff.user).not.toContain('Подпись: не пиши');
   });
 
   it('marks a repeat generation as an update rather than a new record', async () => {

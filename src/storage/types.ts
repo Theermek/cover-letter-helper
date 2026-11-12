@@ -66,6 +66,7 @@ export interface ExportFile {
     provider: string | null;
     model: string | null;
     cvText: string;
+    signature: { enabled: boolean; ru: string; en: string };
     defaultLanguage: string;
     defaultLength: string;
   } | null;

@@ -56,6 +56,7 @@ export const GenerationView = ({ variant }: Props) => {
   const [language, setLanguage] = useState<LetterLanguage>('auto');
   const [length, setLength] = useState<LetterLength>('medium');
   const [letter, setLetter] = useState('');
+  const [withSignature, setWithSignature] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   // Restore the last defaults once settings arrive.
@@ -64,6 +65,7 @@ export const GenerationView = ({ variant }: Props) => {
     if (!settingsLoaded || defaultsApplied) return;
     setLanguage(settings.defaults.language);
     setLength(settings.defaults.length);
+    setWithSignature(settings.signature.enabled);
     setDefaultsApplied(true);
   }, [settingsLoaded, defaultsApplied, settings.defaults]);
 
@@ -77,6 +79,7 @@ export const GenerationView = ({ variant }: Props) => {
       setUserPrompt(state.input.userPrompt);
       setLanguage(state.input.language);
       setLength(state.input.length);
+      setWithSignature(state.input.withSignature);
     }
     setStateApplied(true);
   }, [stateLoaded, stateApplied, state.input]);
@@ -112,6 +115,14 @@ export const GenerationView = ({ variant }: Props) => {
     [language, length],
   );
 
+  const toggleSignature = useCallback(
+    (next: boolean) => {
+      setWithSignature(next);
+      void saveSettings({ signature: { ...settings.signature, enabled: next } });
+    },
+    [settings.signature],
+  );
+
   const generate = useCallback(async () => {
     const text = vacancyText.trim();
     if (!text) {
@@ -123,12 +134,12 @@ export const GenerationView = ({ variant }: Props) => {
     try {
       await sendMessage({
         type: 'generate',
-        input: { vacancyText: text, language, length, userPrompt },
+        input: { vacancyText: text, language, length, userPrompt, withSignature },
       });
     } catch (error) {
       setFormError(isAppErrorShape(error) ? error.message : STRINGS.common.loading);
     }
-  }, [vacancyText, language, length, userPrompt]);
+  }, [vacancyText, language, length, userPrompt, withSignature]);
 
   const regenerate = useCallback(async () => {
     await sendMessage({ type: 'resetGeneration' });
@@ -257,6 +268,14 @@ export const GenerationView = ({ variant }: Props) => {
             STRINGS.generation.generate
           )}
         </button>
+        <label className="check" title={STRINGS.signature.checkboxHint}>
+          <input
+            type="checkbox"
+            checked={withSignature}
+            onChange={(e) => toggleSignature(e.target.checked)}
+          />
+          {STRINGS.signature.checkbox}
+        </label>
         <span className="spacer" />
         <button
           type="button"

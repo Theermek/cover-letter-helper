@@ -14,6 +14,7 @@ import {
   type LetterLanguage,
   type LetterLength,
 } from '../config/lengths';
+import { DEFAULT_SIGNATURES, type SignatureTemplates } from '../lib/signature';
 
 export interface Settings {
   provider: ProviderId | null;
@@ -24,6 +25,8 @@ export interface Settings {
   /** Model lists refreshed from a provider's own /models endpoint. */
   fetchedModels: Partial<Record<ProviderId, ModelOption[]>>;
   cvText: string;
+  /** Appended by code after generation, never written by the model. */
+  signature: SignatureTemplates;
   defaults: {
     language: LetterLanguage;
     length: LetterLength;
@@ -38,6 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   models: {},
   fetchedModels: {},
   cvText: '',
+  signature: DEFAULT_SIGNATURES,
   defaults: { language: 'auto', length: 'medium' },
 };
 
@@ -78,12 +82,24 @@ const coerce = (raw: unknown): Settings => {
     return out;
   };
 
+  const pickSignature = (input: unknown): SignatureTemplates => {
+    const source = (typeof input === 'object' && input !== null ? input : {}) as Partial<
+      SignatureTemplates
+    >;
+    return {
+      enabled: source.enabled === true,
+      ru: typeof source.ru === 'string' ? source.ru : DEFAULT_SIGNATURES.ru,
+      en: typeof source.en === 'string' ? source.en : DEFAULT_SIGNATURES.en,
+    };
+  };
+
   return {
     provider: isProviderId(value.provider) ? value.provider : null,
     apiKeys: pickStrings(value.apiKeys),
     models: pickStrings(value.models),
     fetchedModels: pickModels(value.fetchedModels),
     cvText: typeof value.cvText === 'string' ? value.cvText : '',
+    signature: pickSignature(value.signature),
     defaults: {
       language: isLetterLanguage(defaults.language) ? defaults.language : 'auto',
       length: isLetterLength(defaults.length) ? defaults.length : 'medium',
@@ -152,6 +168,7 @@ export const exportableSettings = (settings: Settings) => ({
   provider: settings.provider,
   model: settings.provider ? (settings.models[settings.provider] ?? null) : null,
   cvText: settings.cvText,
+  signature: settings.signature,
   defaultLanguage: settings.defaults.language,
   defaultLength: settings.defaults.length,
 });

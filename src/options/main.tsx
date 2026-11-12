@@ -83,6 +83,39 @@ const Options = () => {
         <ContactsEditor />
       </section>
 
+      <section className="card stack-sm">
+        <h2>{STRINGS.signature.section}</h2>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={settings.signature.enabled}
+            onChange={(e) =>
+              void saveSettings({ signature: { ...settings.signature, enabled: e.target.checked } })
+            }
+          />
+          {STRINGS.signature.checkbox}
+        </label>
+        <label htmlFor="signature-ru">{STRINGS.signature.ruLabel}</label>
+        <textarea
+          id="signature-ru"
+          rows={2}
+          value={settings.signature.ru}
+          onChange={(e) =>
+            void saveSettings({ signature: { ...settings.signature, ru: e.target.value } })
+          }
+        />
+        <label htmlFor="signature-en">{STRINGS.signature.enLabel}</label>
+        <textarea
+          id="signature-en"
+          rows={2}
+          value={settings.signature.en}
+          onChange={(e) =>
+            void saveSettings({ signature: { ...settings.signature, en: e.target.value } })
+          }
+        />
+        <p className="hint">{STRINGS.signature.checkboxHint}</p>
+      </section>
+
       <section className="card stack">
         <h2>{STRINGS.options.defaultsSection}</h2>
         <div className="controls">

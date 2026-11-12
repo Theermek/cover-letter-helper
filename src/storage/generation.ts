@@ -23,6 +23,12 @@ export interface GenerationInput {
   language: LetterLanguage;
   length: LetterLength;
   userPrompt: string;
+  /**
+   * Travels with the request rather than being read from settings at the end:
+   * the worker must finish the run the user actually started, even if the
+   * checkbox is toggled in another window while the request is in flight.
+   */
+  withSignature: boolean;
 }
 
 export interface GenerationResult {
