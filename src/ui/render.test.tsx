@@ -207,7 +207,29 @@ describe('GenerationView', () => {
     installChromeStub({ settings: configured });
     const { GenerationView } = await import('./GenerationView');
 
-    expect(await render(<GenerationView variant="popup" />)).toContain('Открыть в окне');
-    expect(await render(<GenerationView variant="editor" />)).not.toContain('Открыть в окне');
+    await render(<GenerationView variant="popup" />);
+    expect(container.querySelector('[aria-label="Открыть в окне"]')).not.toBeNull();
+
+    await render(<GenerationView variant="editor" />);
+    expect(container.querySelector('[aria-label="Открыть в окне"]')).toBeNull();
+  });
+
+  it('puts copy and regenerate next to the label, not below the textarea', async () => {
+    installChromeStub({ settings: configured, generation: doneState });
+    const { GenerationView } = await import('./GenerationView');
+
+    await render(<GenerationView variant="popup" />);
+
+    const copyButton = container.querySelector('[aria-label="Скопировать"]');
+    const regenerateButton = container.querySelector('[aria-label="Сгенерировать заново"]');
+    expect(copyButton).not.toBeNull();
+    expect(regenerateButton).not.toBeNull();
+
+    // Both must precede the textarea in document order: that is what keeps them
+    // above the popup's scroll edge, which is the whole point of the change.
+    const textarea = container.querySelector('#letter')!;
+    const precedesTextarea = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(copyButton!.compareDocumentPosition(textarea) & precedesTextarea).toBeTruthy();
+    expect(regenerateButton!.compareDocumentPosition(textarea) & precedesTextarea).toBeTruthy();
   });
 });

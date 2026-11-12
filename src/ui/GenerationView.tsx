@@ -48,7 +48,7 @@ interface Props {
 export const GenerationView = ({ variant }: Props) => {
   const { settings, loaded: settingsLoaded } = useSettings();
   const { state, loaded: stateLoaded } = useGenerationState();
-  const [copied, flashCopied] = useFlash();
+  const [copied, flashCopied] = useFlash(1500);
 
   const [vacancyText, setVacancyText] = useState('');
   const [userPrompt, setUserPrompt] = useState('');
@@ -135,7 +135,15 @@ export const GenerationView = ({ variant }: Props) => {
   }, [generate]);
 
   const copy = useCallback(() => {
-    void navigator.clipboard.writeText(letter).then(() => flashCopied(STRINGS.generation.copied));
+    // A rejected clipboard write is silent otherwise: the icon would simply
+    // never turn into a tick and the user would not know why.
+    void navigator.clipboard
+      .writeText(letter)
+      .then(() => {
+        setFormError(null);
+        flashCopied(STRINGS.generation.copied);
+      })
+      .catch(() => setFormError(STRINGS.generation.copyError));
   }, [letter, flashCopied]);
 
   const persistLetter = useCallback(() => {
@@ -175,8 +183,14 @@ export const GenerationView = ({ variant }: Props) => {
         <div className="row-between">
           <label htmlFor="vacancy">{STRINGS.generation.vacancyLabel}</label>
           {variant === 'popup' && (
-            <button type="button" className="ghost icon" onClick={openEditor}>
-              ⤢ {STRINGS.generation.expand}
+            <button
+              type="button"
+              className="ghost icon-btn"
+              title={STRINGS.generation.expand}
+              aria-label={STRINGS.generation.expand}
+              onClick={openEditor}
+            >
+              ⤢
             </button>
           )}
         </div>
@@ -243,11 +257,23 @@ export const GenerationView = ({ variant }: Props) => {
           )}
         </button>
         <span className="spacer" />
-        <button type="button" className="ghost icon" onClick={openStats}>
-          {STRINGS.common.stats}
+        <button
+          type="button"
+          className="ghost icon-btn"
+          title={STRINGS.common.stats}
+          aria-label={STRINGS.common.stats}
+          onClick={openStats}
+        >
+          ▤
         </button>
-        <button type="button" className="ghost icon" onClick={openOptions}>
-          {STRINGS.common.settings}
+        <button
+          type="button"
+          className="ghost icon-btn"
+          title={STRINGS.common.settings}
+          aria-label={STRINGS.common.settings}
+          onClick={openOptions}
+        >
+          ⚙
         </button>
       </div>
 
@@ -264,9 +290,32 @@ export const GenerationView = ({ variant }: Props) => {
 
       {state.status === 'done' && state.result && (
         <div className="stack-sm">
+          {/* Both actions live in the label row: below the textarea they were
+              past the popup's scroll edge and effectively invisible. */}
           <div className="row-between">
             <label htmlFor="letter">{STRINGS.generation.resultLabel}</label>
-            <span className="hint">{STRINGS.cv.wordCount(countWords(letter))}</span>
+            <div className="row">
+              <span className="hint">{STRINGS.cv.wordCount(countWords(letter))}</span>
+              <button
+                type="button"
+                className="ghost icon-btn"
+                title={STRINGS.generation.copy}
+                aria-label={STRINGS.generation.copy}
+                onClick={copy}
+              >
+                {copied === null ? '⧉' : '✓'}
+              </button>
+              <button
+                type="button"
+                className="ghost icon-btn"
+                disabled={isRunning}
+                title={STRINGS.generation.regenerate}
+                aria-label={STRINGS.generation.regenerate}
+                onClick={() => void regenerate()}
+              >
+                ↻
+              </button>
+            </div>
           </div>
           <textarea
             id="letter"
@@ -275,22 +324,13 @@ export const GenerationView = ({ variant }: Props) => {
             onChange={(e) => setLetter(e.target.value)}
             onBlur={persistLetter}
           />
-          <div className="row">
-            <button type="button" onClick={copy}>
-              {copied ?? STRINGS.generation.copy}
-            </button>
-            <button type="button" disabled={isRunning} onClick={() => void regenerate()}>
-              {STRINGS.generation.regenerate}
-            </button>
-            <span className="spacer" />
-            <span className="hint">
-              {state.result.vacancyId === null
-                ? STRINGS.generation.notSaved
-                : state.result.createdNew
-                  ? STRINGS.generation.savedNew
-                  : STRINGS.generation.savedUpdated}
-            </span>
-          </div>
+          <span className="hint">
+            {state.result.vacancyId === null
+              ? STRINGS.generation.notSaved
+              : state.result.createdNew
+                ? STRINGS.generation.savedNew
+                : STRINGS.generation.savedUpdated}
+          </span>
         </div>
       )}
     </div>
