@@ -22,6 +22,7 @@ import { activeConfig, saveSettings } from '../storage/settings';
 import { takePendingVacancy } from '../storage/generation';
 import { useFlash, useGenerationState, useSettings } from './hooks';
 import { Segmented } from './components/Segmented';
+import { ContactsBlock } from './components/ContactsBlock';
 
 const LANGUAGE_OPTIONS = LETTER_LANGUAGES.map((value) => ({
   value,
@@ -276,6 +277,9 @@ export const GenerationView = ({ variant }: Props) => {
           ⚙
         </button>
       </div>
+
+      {/* Collapsed by default in the popup so it costs one line, not a screen. */}
+      <ContactsBlock defaultOpen={variant === 'editor'} />
 
       {formError && <p className="error">{formError}</p>}
       {state.status === 'error' && state.error && <p className="error">{state.error.message}</p>}

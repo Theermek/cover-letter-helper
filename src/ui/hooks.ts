@@ -13,6 +13,8 @@ import {
   onGenerationChanged,
   type GenerationState,
 } from '../storage/generation';
+import { contactsStore } from '../storage/contacts';
+import type { Contact } from '../storage/types';
 
 /** Settings plus a `loaded` flag, kept in sync across every open page. */
 export const useSettings = (): { settings: Settings; loaded: boolean; reload: () => void } => {
@@ -52,6 +54,37 @@ export const useGenerationState = (): { state: GenerationState; loaded: boolean 
   }, []);
 
   return { state, loaded };
+};
+
+/**
+ * Contacts, kept in sync across open pages. The component only ever sees the
+ * `ContactsStore` interface, so moving contacts to the server on stage 1 does
+ * not touch this hook's callers.
+ */
+export const useContacts = (): {
+  contacts: readonly Contact[];
+  loaded: boolean;
+  save: (next: readonly Contact[]) => Promise<void>;
+} => {
+  const [contacts, setContacts] = useState<readonly Contact[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    void contactsStore.list().then((next) => {
+      setContacts(next);
+      setLoaded(true);
+    });
+    return contactsStore.subscribe(setContacts);
+  }, []);
+
+  const save = useCallback(async (next: readonly Contact[]) => {
+    // Optimistic: the editor stays responsive while the write lands, and the
+    // storage subscription corrects us if the stored value differs.
+    setContacts(next);
+    await contactsStore.save(next);
+  }, []);
+
+  return { contacts, loaded, save };
 };
 
 /** Shows a transient confirmation ("Скопировано") and clears it on its own. */

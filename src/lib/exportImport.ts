@@ -9,13 +9,19 @@
 import { EXPORT_SCHEMA_VERSION, type ExportFile, type VacancyRecord } from '../storage/types';
 import { clearVacancies, importVacancies, listVacancies } from '../storage/db';
 import { exportableSettings, getSettings } from '../storage/settings';
+import { coerceContacts, contactsStore, mergeContacts } from '../storage/contacts';
 
 export const buildExport = async (): Promise<ExportFile> => {
-  const [vacancies, settings] = await Promise.all([listVacancies(), getSettings()]);
+  const [vacancies, settings, contacts] = await Promise.all([
+    listVacancies(),
+    getSettings(),
+    contactsStore.list(),
+  ]);
   return {
     schemaVersion: EXPORT_SCHEMA_VERSION,
     exportedAt: Date.now(),
     vacancies,
+    contacts: [...contacts],
     settings: exportableSettings(settings),
   };
 };
@@ -52,6 +58,13 @@ export const importFromFile = async (file: File): Promise<{ added: number; skipp
   if (typeof parsed !== 'object' || parsed === null) throw new Error('not an export file');
   const payload = parsed as Partial<ExportFile>;
   if (!Array.isArray(payload.vacancies)) throw new Error('not an export file');
+
+  // Contacts are merged rather than replaced: importing a file must never wipe
+  // contacts the user has already entered on this machine.
+  const incoming = coerceContacts(payload.contacts);
+  if (incoming.length > 0) {
+    await contactsStore.save(mergeContacts(await contactsStore.list(), incoming));
+  }
 
   const records = payload.vacancies.filter(isVacancyRecord);
   return importVacancies(records);

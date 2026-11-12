@@ -36,6 +36,13 @@ export interface VacancyRecord {
   letter: string;
 }
 
+/** One "Telegram -> @name" pair shown in the popup (TASK2 §0.2). */
+export interface Contact {
+  id: string;
+  label: string;
+  value: string;
+}
+
 export interface CompanyRequirements {
   found: boolean;
   mode: RequirementMode;
@@ -43,13 +50,17 @@ export interface CompanyRequirements {
   description: string | null;
 }
 
-/** Bumped when the export file format changes, so imports can migrate. */
-export const EXPORT_SCHEMA_VERSION = 1;
+/**
+ * Bumped when the export file format changes, so imports can migrate.
+ * v2 added `contacts`; a v1 file simply has none and imports fine.
+ */
+export const EXPORT_SCHEMA_VERSION = 2;
 
 export interface ExportFile {
   schemaVersion: number;
   exportedAt: number;
   vacancies: VacancyRecord[];
+  contacts: Contact[];
   /** Settings minus every API key -- keys are never exported (TASK §9). */
   settings: {
     provider: string | null;

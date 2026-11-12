@@ -14,6 +14,7 @@ import { saveSettings } from '../storage/settings';
 import { useFlash, useSettings } from '../ui/hooks';
 import { ProviderForm } from '../ui/components/ProviderForm';
 import { CvEditor } from '../ui/components/CvEditor';
+import { ContactsEditor } from '../ui/components/ContactsEditor';
 import { Segmented } from '../ui/components/Segmented';
 import '../ui/styles.css';
 
@@ -75,6 +76,11 @@ const Options = () => {
       <section className="card">
         <h2>{STRINGS.cv.title}</h2>
         <CvEditor value={cvText ?? settings.cvText} onChange={setCvText} />
+      </section>
+
+      <section className="card">
+        <h2>{STRINGS.contacts.section}</h2>
+        <ContactsEditor />
       </section>
 
       <section className="card stack">

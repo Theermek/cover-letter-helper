@@ -125,6 +125,51 @@ describe('Onboarding', () => {
   });
 });
 
+describe('ContactsBlock', () => {
+  it('renders nothing at all when there are no contacts', async () => {
+    installChromeStub({ settings: configured });
+    const { GenerationView } = await import('./GenerationView');
+
+    await render(<GenerationView variant="popup" />);
+
+    expect(container.querySelector('.contacts')).toBeNull();
+  });
+
+  it('lists the contacts in stored order with a copy button each', async () => {
+    installChromeStub({
+      settings: configured,
+      contacts: [
+        { id: 'c1', label: 'Telegram', value: '@theermek' },
+        { id: 'c2', label: 'GitHub', value: 'github.com/theermek' },
+      ],
+    });
+    const { GenerationView } = await import('./GenerationView');
+
+    const text = await render(<GenerationView variant="popup" />);
+
+    expect(text).toContain('Мои контакты (2)');
+    expect([...container.querySelectorAll('.contact-label')].map((n) => n.textContent)).toEqual([
+      'Telegram',
+      'GitHub',
+    ]);
+    expect(container.querySelector('[aria-label="Скопировать: Telegram"]')).not.toBeNull();
+  });
+
+  it('stays collapsed in the popup and open in the editor', async () => {
+    installChromeStub({
+      settings: configured,
+      contacts: [{ id: 'c1', label: 'Telegram', value: '@theermek' }],
+    });
+    const { GenerationView } = await import('./GenerationView');
+
+    await render(<GenerationView variant="popup" />);
+    expect(container.querySelector<HTMLDetailsElement>('.contacts')?.open).toBe(false);
+
+    await render(<GenerationView variant="editor" />);
+    expect(container.querySelector<HTMLDetailsElement>('.contacts')?.open).toBe(true);
+  });
+});
+
 describe('GenerationView', () => {
   it('prompts for setup when no provider is configured', async () => {
     installChromeStub();

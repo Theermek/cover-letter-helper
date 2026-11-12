@@ -83,6 +83,22 @@ export const STRINGS = {
     emptyVacancy: 'Вставьте текст вакансии.',
   },
 
+  contacts: {
+    title: 'Мои контакты',
+    summary: (n: number) => `Мои контакты (${n})`,
+    empty: 'Контактов пока нет.',
+    emptyHint: 'Добавьте их в настройках, чтобы вставлять в отклик одним нажатием.',
+    section: 'Контакты',
+    labelPlaceholder: 'Telegram',
+    valuePlaceholder: '@username',
+    add: 'Добавить контакт',
+    up: 'Выше',
+    down: 'Ниже',
+    remove: 'Удалить контакт',
+    copyValue: (label: string) => `Скопировать: ${label}`,
+    hint: 'Показываются в popup под письмом. Порядок здесь задаёт порядок там.',
+  },
+
   stats: {
     title: 'Требования рынка',
     show: 'Показать требования рынка',
