@@ -11,6 +11,7 @@ import { BANNED_PHRASES_EN, BANNED_PHRASES_RU } from '../config/bannedPhrases';
 import { LENGTH_PRESETS } from '../config/lengths';
 import { SOFT_SKILL_CATEGORIES } from '../config/softSkills';
 import { EXAMPLE_EN, EXAMPLE_RU } from './examples';
+import { HUMANIZER_RULES } from './humanizer';
 
 const bullet = (items: readonly string[]): string => items.map((i) => `- ${i}`).join('\n');
 
@@ -81,6 +82,8 @@ ${bullet([
 
 Шаблонные фразы, которые писать нельзя (ни эти, ни их близкие варианты):
 ${bullet([...BANNED_PHRASES_RU, ...BANNED_PHRASES_EN])}
+
+${HUMANIZER_RULES}
 
 # СОДЕРЖАНИЕ ПИСЬМА
 

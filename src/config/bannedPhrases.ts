@@ -16,6 +16,13 @@ export const BANNED_PHRASES_RU: readonly string[] = [
   'надеюсь на положительный ответ',
   'буду рад возможности обсудить',
   'данная вакансия меня очень заинтересовала',
+  'служит свидетельством',
+  'играет ключевую роль',
+  'подчёркивает важность',
+  'в современном быстро меняющемся мире',
+  'комплексный подход к решению задач',
+  'не просто код, а',
+  'в заключение хочу отметить',
 ];
 
 export const BANNED_PHRASES_EN: readonly string[] = [
@@ -31,6 +38,13 @@ export const BANNED_PHRASES_EN: readonly string[] = [
   'hit the ground running',
   'delve',
   'tapestry',
+  'testament to',
+  'underscores',
+  "in today's fast-paced world",
+  'ever-evolving landscape',
+  'seamless',
+  'cutting-edge',
+  'not only ... but also',
 ];
 
 export const BANNED_PHRASES: readonly string[] = [...BANNED_PHRASES_RU, ...BANNED_PHRASES_EN];
