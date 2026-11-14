@@ -7,6 +7,7 @@
  * rewritten when the backend appears.
  */
 
+import { fetchProfile, onProfileChanged, saveProfile } from '../api/profile';
 import type { Contact } from './types';
 
 export interface ContactsStore {
@@ -65,8 +66,40 @@ export const chromeStorageContacts: ContactsStore = {
   },
 };
 
-/** The one instance the app uses; swapped for an API-backed store on stage 1. */
-export const contactsStore: ContactsStore = chromeStorageContacts;
+/**
+ * Contacts on the server (TASK2 §1.5). This is the payoff of having declared
+ * ContactsStore in stage 0: the components, the editor and the popup block are
+ * untouched by the move -- only this implementation is new.
+ *
+ * There is no server-side change feed, so cross-page sync reuses the revision
+ * counter that saveProfile bumps in chrome.storage: another page sees it change
+ * and re-reads the list.
+ */
+export const apiContacts: ContactsStore = {
+  async list() {
+    return (await fetchProfile()).contacts;
+  },
+
+  async save(contacts) {
+    const clean = contacts
+      .map((contact) => ({ ...contact, label: contact.label.trim(), value: contact.value.trim() }))
+      .filter((contact) => contact.label !== '' || contact.value !== '');
+    return (await saveProfile({ contacts: clean })).contacts;
+  },
+
+  subscribe(listener) {
+    return onProfileChanged(() => {
+      void fetchProfile()
+        .then((profile) => listener(profile.contacts))
+        // A failed refresh must not break the subscription; the page shows its
+        // own error state when a read it asked for fails.
+        .catch(() => undefined);
+    });
+  },
+};
+
+/** The one instance the app uses. */
+export const contactsStore: ContactsStore = apiContacts;
 
 export const emptyContact = (): Contact => ({ id: crypto.randomUUID(), label: '', value: '' });
 

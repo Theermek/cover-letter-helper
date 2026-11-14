@@ -11,7 +11,8 @@ import {
 } from '../config/lengths';
 import { deleteAllData, downloadExport, importFromFile } from '../lib/exportImport';
 import { saveSettings } from '../storage/settings';
-import { useFlash, useSettings } from '../ui/hooks';
+import { useFlash, useProfile, useSettings } from '../ui/hooks';
+import { ServerForm } from '../ui/components/ServerForm';
 import { ProviderForm } from '../ui/components/ProviderForm';
 import { CvEditor } from '../ui/components/CvEditor';
 import { ContactsEditor } from '../ui/components/ContactsEditor';
@@ -30,6 +31,7 @@ const LENGTH_OPTIONS = LETTER_LENGTHS.map((value) => ({
 
 const Options = () => {
   const { settings, loaded, reload } = useSettings();
+  const { profile, loaded: profileLoaded, error: profileError, save: saveProfile } = useProfile();
   const [cvText, setCvText] = useState<string | null>(null);
   const [notice, flashNotice] = useFlash(4000);
   const [error, setError] = useState<string | null>(null);
@@ -74,8 +76,21 @@ const Options = () => {
       </section>
 
       <section className="card">
+        <h2>{STRINGS.server.section}</h2>
+        <ServerForm settings={settings} />
+      </section>
+
+      <section className="card">
         <h2>{STRINGS.cv.title}</h2>
-        <CvEditor value={cvText ?? settings.cvText} onChange={setCvText} />
+        {profileError && <p className="error">{profileError}</p>}
+        {!profileLoaded && <p className="hint">{STRINGS.common.loading}</p>}
+        {profile && (
+          <CvEditor
+            value={cvText ?? profile.cvText}
+            onChange={setCvText}
+            onSave={(text) => saveProfile({ cvText: text })}
+          />
+        )}
       </section>
 
       <section className="card">
@@ -85,34 +100,40 @@ const Options = () => {
 
       <section className="card stack-sm">
         <h2>{STRINGS.signature.section}</h2>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={settings.signature.enabled}
-            onChange={(e) =>
-              void saveSettings({ signature: { ...settings.signature, enabled: e.target.checked } })
-            }
-          />
-          {STRINGS.signature.checkbox}
-        </label>
-        <label htmlFor="signature-ru">{STRINGS.signature.ruLabel}</label>
-        <textarea
-          id="signature-ru"
-          rows={2}
-          value={settings.signature.ru}
-          onChange={(e) =>
-            void saveSettings({ signature: { ...settings.signature, ru: e.target.value } })
-          }
-        />
-        <label htmlFor="signature-en">{STRINGS.signature.enLabel}</label>
-        <textarea
-          id="signature-en"
-          rows={2}
-          value={settings.signature.en}
-          onChange={(e) =>
-            void saveSettings({ signature: { ...settings.signature, en: e.target.value } })
-          }
-        />
+        {profile && (
+          <>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={profile.signature.enabled}
+                onChange={(e) =>
+                  void saveProfile({
+                    signature: { ...profile.signature, enabled: e.target.checked },
+                  })
+                }
+              />
+              {STRINGS.signature.checkbox}
+            </label>
+            <label htmlFor="signature-ru">{STRINGS.signature.ruLabel}</label>
+            <textarea
+              id="signature-ru"
+              rows={2}
+              value={profile.signature.ru}
+              onChange={(e) =>
+                void saveProfile({ signature: { ...profile.signature, ru: e.target.value } })
+              }
+            />
+            <label htmlFor="signature-en">{STRINGS.signature.enLabel}</label>
+            <textarea
+              id="signature-en"
+              rows={2}
+              value={profile.signature.en}
+              onChange={(e) =>
+                void saveProfile({ signature: { ...profile.signature, en: e.target.value } })
+              }
+            />
+          </>
+        )}
         <p className="hint">{STRINGS.signature.checkboxHint}</p>
       </section>
 

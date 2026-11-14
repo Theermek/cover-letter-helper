@@ -18,9 +18,9 @@ import {
 import { isAppErrorShape } from '../lib/errors';
 import { countWords } from '../lib/sanitizer';
 import { sendMessage } from '../background/messages';
-import { activeConfig, saveSettings } from '../storage/settings';
+import { activeConfig, hasServer, saveSettings } from '../storage/settings';
 import { takePendingVacancy } from '../storage/generation';
-import { useFlash, useGenerationState, useSettings } from './hooks';
+import { useFlash, useGenerationState, useProfile, useSettings } from './hooks';
 import { Segmented } from './components/Segmented';
 import { ContactsBlock } from './components/ContactsBlock';
 
@@ -48,6 +48,7 @@ interface Props {
 
 export const GenerationView = ({ variant }: Props) => {
   const { settings, loaded: settingsLoaded } = useSettings();
+  const { profile, loaded: profileLoaded, error: profileError, save: saveProfile } = useProfile();
   const { state, loaded: stateLoaded } = useGenerationState();
   const [copied, flashCopied] = useFlash(1500);
 
@@ -65,9 +66,16 @@ export const GenerationView = ({ variant }: Props) => {
     if (!settingsLoaded || defaultsApplied) return;
     setLanguage(settings.defaults.language);
     setLength(settings.defaults.length);
-    setWithSignature(settings.signature.enabled);
     setDefaultsApplied(true);
   }, [settingsLoaded, defaultsApplied, settings.defaults]);
+
+  // The checkbox follows the profile until the user touches it.
+  const [signatureApplied, setSignatureApplied] = useState(false);
+  useEffect(() => {
+    if (!profile || signatureApplied) return;
+    setWithSignature(profile.signature.enabled);
+    setSignatureApplied(true);
+  }, [profile, signatureApplied]);
 
   // Restore whatever the service worker is holding: a request that outlived a
   // closed popup, or a finished letter the user has not seen yet.
@@ -98,8 +106,9 @@ export const GenerationView = ({ variant }: Props) => {
   }, [state.status, state.result]);
 
   const isRunning = state.status === 'running';
-  const ready = activeConfig(settings) !== null;
-  const hasCv = settings.cvText.trim().length > 0;
+  const serverReady = hasServer(settings);
+  const ready = serverReady && activeConfig(settings) !== null;
+  const hasCv = (profile?.cvText ?? '').trim().length > 0;
   const requirements = state.result?.companyRequirements;
   const onlyPhrase = requirements?.mode === 'only_phrase';
 
@@ -118,9 +127,9 @@ export const GenerationView = ({ variant }: Props) => {
   const toggleSignature = useCallback(
     (next: boolean) => {
       setWithSignature(next);
-      void saveSettings({ signature: { ...settings.signature, enabled: next } });
+      if (profile) void saveProfile({ signature: { ...profile.signature, enabled: next } });
     },
-    [settings.signature],
+    [profile, saveProfile],
   );
 
   const generate = useCallback(async () => {
@@ -171,7 +180,19 @@ export const GenerationView = ({ variant }: Props) => {
 
   return (
     <div className={`stack generation generation-${variant}`}>
-      {!ready && (
+      {!serverReady && (
+        <div className="notice">
+          <strong>{STRINGS.server.needed}</strong>
+          {STRINGS.server.neededHint}{' '}
+          <button type="button" className="ghost" onClick={openOptions}>
+            Открыть настройки
+          </button>
+        </div>
+      )}
+
+      {serverReady && profileError && <p className="error">{profileError}</p>}
+
+      {serverReady && !ready && (
         <div className="notice">
           <strong>Нужна настройка</strong>
           Выберите провайдера и введите API-ключ.{' '}
@@ -181,7 +202,7 @@ export const GenerationView = ({ variant }: Props) => {
         </div>
       )}
 
-      {ready && !hasCv && (
+      {ready && profileLoaded && !profileError && !hasCv && (
         <div className="notice">
           <strong>{STRINGS.cv.empty}</strong>
           {STRINGS.cv.emptyHint}{' '}

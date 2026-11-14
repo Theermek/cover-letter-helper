@@ -8,6 +8,7 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { installChromeStub } from '../ui/testing/chromeStub';
+import { installFetchStub } from '../api/testing/fetchStub';
 import { appError } from '../lib/errors';
 import type { ParsedResponse } from '../schema/response';
 import type { GenerationInput } from '../storage/generation';
@@ -24,13 +25,18 @@ vi.mock('../providers', () => ({
 }));
 
 const settings = {
+  server: { url: 'http://localhost:3000', token: 'test-token' },
   provider: 'openai',
   apiKeys: { openai: 'sk-test' },
   models: { openai: 'gpt-4.1-mini' },
   fetchedModels: {},
+  defaults: { language: 'ru', length: 'medium' },
+};
+
+/** The CV and the signature templates come from the server now (TASK2 §1.5). */
+const profile = {
   cvText: 'React, TypeScript, три года.',
   signature: { enabled: false, ru: 'С уважением, Эрмек', en: 'Best regards, Ermek' },
-  defaults: { language: 'ru', length: 'medium' },
 };
 
 const response = (over: Partial<ParsedResponse> = {}): ParsedResponse => ({
@@ -56,6 +62,7 @@ const input = (over: Partial<GenerationInput> = {}): GenerationInput => ({
 beforeEach(async () => {
   vi.clearAllMocks();
   installChromeStub({ settings });
+  installFetchStub(profile);
   const { clearVacancies } = await import('../storage/db');
   await clearVacancies();
 });
@@ -149,7 +156,7 @@ describe('startGeneration', () => {
   });
 
   it('refuses to generate without a CV and never calls the provider', async () => {
-    installChromeStub({ settings: { ...settings, cvText: '   ' } });
+    installFetchStub({ ...profile, cvText: '   ' });
     const { startGeneration } = await import('./generation');
 
     const state = await startGeneration(input());
@@ -161,6 +168,7 @@ describe('startGeneration', () => {
 
   it('refuses to generate before onboarding is finished', async () => {
     installChromeStub({ settings: { ...settings, apiKeys: {} } });
+    installFetchStub(profile);
     const { startGeneration } = await import('./generation');
 
     const state = await startGeneration(input());

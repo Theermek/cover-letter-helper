@@ -10,10 +10,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { installChromeStub } from './testing/chromeStub';
+import { installFetchStub } from '../api/testing/fetchStub';
 import type { Settings } from '../storage/settings';
 import type { GenerationState } from '../storage/generation';
 
 const configured: Settings = {
+  server: { url: 'http://localhost:3000', token: 'test-token' },
   provider: 'openai',
   apiKeys: { openai: 'sk-test' },
   models: { openai: 'gpt-4.1-mini' },
@@ -77,6 +79,7 @@ const render = async (node: React.ReactNode): Promise<string> => {
 };
 
 beforeEach(() => {
+  installFetchStub();
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -143,8 +146,8 @@ describe('ContactsBlock', () => {
   });
 
   it('lists the contacts in stored order with a copy button each', async () => {
-    installChromeStub({
-      settings: configured,
+    installChromeStub({ settings: configured });
+    installFetchStub({
       contacts: [
         { id: 'c1', label: 'Telegram', value: '@theermek' },
         { id: 'c2', label: 'GitHub', value: 'github.com/theermek' },
@@ -163,10 +166,8 @@ describe('ContactsBlock', () => {
   });
 
   it('stays collapsed in the popup and open in the editor', async () => {
-    installChromeStub({
-      settings: configured,
-      contacts: [{ id: 'c1', label: 'Telegram', value: '@theermek' }],
-    });
+    installChromeStub({ settings: configured });
+    installFetchStub({ contacts: [{ id: 'c1', label: 'Telegram', value: '@theermek' }] });
     const { GenerationView } = await import('./GenerationView');
 
     await render(<GenerationView variant="popup" />);
@@ -178,18 +179,21 @@ describe('ContactsBlock', () => {
 });
 
 describe('GenerationView', () => {
-  it('prompts for setup when no provider is configured', async () => {
+  it('prompts for server setup on a fresh install', async () => {
     installChromeStub();
     const { GenerationView } = await import('./GenerationView');
 
     const text = await render(<GenerationView variant="popup" />);
 
-    expect(text).toContain('Нужна настройка');
+    // Without a server there is nowhere to read the CV from, so that notice
+    // comes first -- telling the user to pick a provider would be premature.
+    expect(text).toContain('Нужно настроить сервер');
     expect(container.querySelector<HTMLButtonElement>('button.primary')?.disabled).toBe(true);
   });
 
-  it('asks for a CV when the provider is set but the CV is empty', async () => {
-    installChromeStub({ settings: { ...configured, cvText: '' } });
+  it('asks for a CV when the server has none stored', async () => {
+    installChromeStub({ settings: configured });
+    installFetchStub({ cvText: '' });
     const { GenerationView } = await import('./GenerationView');
 
     const text = await render(<GenerationView variant="popup" />);
@@ -200,6 +204,7 @@ describe('GenerationView', () => {
 
   it('enables generation once provider and CV are both present', async () => {
     installChromeStub({ settings: configured });
+    installFetchStub({ cvText: 'Три года React.' });
     const { GenerationView } = await import('./GenerationView');
 
     const text = await render(<GenerationView variant="popup" />);
@@ -211,6 +216,7 @@ describe('GenerationView', () => {
 
   it('restores a finished letter and shows the company requirement block', async () => {
     installChromeStub({ settings: configured, generation: doneState });
+    installFetchStub({ cvText: 'Три года React.' });
     const { GenerationView } = await import('./GenerationView');
 
     const text = await render(<GenerationView variant="popup" />);
@@ -268,6 +274,7 @@ describe('GenerationView', () => {
 
   it('puts copy and regenerate next to the label, not below the textarea', async () => {
     installChromeStub({ settings: configured, generation: doneState });
+    installFetchStub({ cvText: 'Три года React.' });
     const { GenerationView } = await import('./GenerationView');
 
     await render(<GenerationView variant="popup" />);

@@ -13,6 +13,7 @@ import { sanitizeLetter } from '../lib/sanitizer';
 import { appendSignature, resolveSignature } from '../lib/signature';
 import { vacancyTextHash } from '../lib/hash';
 import { activeConfig, getSettings } from '../storage/settings';
+import { fetchProfile } from '../api/profile';
 import { getVacancy, upsertVacancy } from '../storage/db';
 import {
   getGenerationState,
@@ -70,7 +71,11 @@ const run = async (input: GenerationInput): Promise<GenerationState> => {
         'Сначала выберите провайдера и введите API-ключ в настройках.',
       );
     }
-    if (!settings.cvText.trim()) {
+    // The CV and the signature templates live on the server now (TASK2 §1.5).
+    // A failure here is a real failure: generating from an empty CV would
+    // silently produce a letter with no facts in it.
+    const profile = await fetchProfile();
+    if (!profile.cvText.trim()) {
       throw new AppError('unknown', 'Добавьте CV в настройках, без него письмо не сгенерировать.');
     }
 
@@ -79,7 +84,7 @@ const run = async (input: GenerationInput): Promise<GenerationState> => {
       system: buildSystemPrompt({ withSignature: input.withSignature }),
       user: buildUserPrompt({
         vacancyText,
-        cvText: settings.cvText,
+        cvText: profile.cvText,
         language: input.language,
         length: input.length,
         userPrompt: input.userPrompt,
@@ -107,7 +112,11 @@ const run = async (input: GenerationInput): Promise<GenerationState> => {
       input.withSignature && parsed.companyRequirements.mode !== 'only_phrase'
         ? appendSignature(
             sanitized,
-            resolveSignature(settings.signature, input.language, sanitized),
+            resolveSignature(
+              { enabled: true, ru: profile.signature.ru, en: profile.signature.en },
+              input.language,
+              sanitized,
+            ),
           )
         : sanitized;
 

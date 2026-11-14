@@ -16,7 +16,15 @@ import {
 } from '../config/lengths';
 import { DEFAULT_SIGNATURES, type SignatureTemplates } from '../lib/signature';
 
+/** Where the backend lives and how we authenticate to it (TASK2 §1.5). */
+export interface ServerSettings {
+  url: string;
+  /** Static bearer token; the server holds the same string in its env. */
+  token: string;
+}
+
 export interface Settings {
+  server: ServerSettings;
   provider: ProviderId | null;
   /** Per-provider API key. Never exported, never logged. */
   apiKeys: Partial<Record<ProviderId, string>>;
@@ -36,6 +44,9 @@ export interface Settings {
 const SETTINGS_KEY = 'settings';
 
 export const DEFAULT_SETTINGS: Settings = {
+  // The default assumes the server runs on the same machine, which is how it
+  // is meant to be used until a deployment target is chosen.
+  server: { url: 'http://localhost:3000', token: '' },
   provider: null,
   apiKeys: {},
   models: {},
@@ -93,7 +104,18 @@ const coerce = (raw: unknown): Settings => {
     };
   };
 
+  const pickServer = (input: unknown): ServerSettings => {
+    const source = (typeof input === 'object' && input !== null ? input : {}) as Partial<
+      ServerSettings
+    >;
+    return {
+      url: typeof source.url === 'string' ? source.url : DEFAULT_SETTINGS.server.url,
+      token: typeof source.token === 'string' ? source.token : '',
+    };
+  };
+
   return {
+    server: pickServer(value.server),
     provider: isProviderId(value.provider) ? value.provider : null,
     apiKeys: pickStrings(value.apiKeys),
     models: pickStrings(value.models),
@@ -162,6 +184,15 @@ export const activeConfig = (settings: Settings): ActiveConfig | null => {
 };
 
 export const isOnboarded = (settings: Settings): boolean => activeConfig(settings) !== null;
+
+/** True when the extension knows where the server is and how to authenticate. */
+export const hasServer = (settings: Settings): boolean =>
+  settings.server.url.trim() !== '' && settings.server.token.trim() !== '';
+
+export const setServer = async (patch: Partial<ServerSettings>): Promise<Settings> => {
+  const current = await getSettings();
+  return saveSettings({ server: { ...current.server, ...patch } });
+};
 
 /** Everything the export file may contain -- API keys are structurally absent. */
 export const exportableSettings = (settings: Settings) => ({

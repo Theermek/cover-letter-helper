@@ -7,6 +7,7 @@
  */
 
 import type { LetterLanguage } from '../config/lengths';
+import { DEFAULT_SIGNATURE_EN, DEFAULT_SIGNATURE_RU } from '../../shared/defaults';
 
 export interface SignatureTemplates {
   enabled: boolean;
@@ -16,8 +17,8 @@ export interface SignatureTemplates {
 
 export const DEFAULT_SIGNATURES: SignatureTemplates = {
   enabled: false,
-  ru: 'Телеграм для связи: @theermek, с уважением, Эрмек Акелов',
-  en: 'Telegram: @theermek. Best regards, Ermek Akelov',
+  ru: DEFAULT_SIGNATURE_RU,
+  en: DEFAULT_SIGNATURE_EN,
 };
 
 const CYRILLIC = /\p{Script=Cyrillic}/gu;

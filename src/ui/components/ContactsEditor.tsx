@@ -12,7 +12,7 @@ import type { Contact } from '../../storage/types';
 import { useContacts } from '../hooks';
 
 export const ContactsEditor = () => {
-  const { contacts, loaded, save } = useContacts();
+  const { contacts, loaded, error, save } = useContacts();
 
   const update = useCallback(
     (id: string, patch: Partial<Contact>) => {
@@ -43,7 +43,8 @@ export const ContactsEditor = () => {
 
   return (
     <div className="stack-sm">
-      {contacts.length === 0 && <p className="hint">{STRINGS.contacts.empty}</p>}
+      {error && <p className="error">{error}</p>}
+      {!error && contacts.length === 0 && <p className="hint">{STRINGS.contacts.empty}</p>}
 
       {contacts.map((contact, index) => (
         <div key={contact.id} className="row contact-edit-row">

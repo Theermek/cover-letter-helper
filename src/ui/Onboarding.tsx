@@ -35,7 +35,7 @@ export const Onboarding = ({ settings, onDone }: Props) => {
       ) : (
         <div className="stack">
           <h2>{STRINGS.cv.title}</h2>
-          <CvEditor value={cvText} onChange={setCvText} autosave={false} rows={8} />
+          <CvEditor value={cvText} onChange={setCvText} rows={8} />
           <div className="row">
             <button type="button" className="ghost" onClick={() => setStep('provider')}>
               {STRINGS.common.back}

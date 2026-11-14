@@ -83,7 +83,15 @@ check(
 );
 
 const hostPermissions = manifest.host_permissions ?? [];
-for (const host of ['api.openai.com', 'api.anthropic.com', 'generativelanguage.googleapis.com']) {
+// localhost is where the backend runs during development; without the
+// permission MV3 blocks the request before it leaves the extension.
+for (const host of [
+  'localhost',
+  '127.0.0.1',
+  'api.openai.com',
+  'api.anthropic.com',
+  'generativelanguage.googleapis.com',
+]) {
   check(
     hostPermissions.some((p) => p.includes(host)),
     `host_permissions is missing ${host}; requests to it would be blocked`,

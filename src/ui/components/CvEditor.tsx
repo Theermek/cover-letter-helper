@@ -9,18 +9,21 @@ import { useCallback, useRef, useState } from 'react';
 import { STRINGS } from '../../config/strings';
 import { countWords } from '../../lib/sanitizer';
 import { extractPdfText } from '../../lib/pdf';
-import { saveSettings } from '../../storage/settings';
 import { useFlash } from '../hooks';
 
 interface Props {
   value: string;
   onChange: (text: string) => void;
-  /** Autosave on blur; onboarding saves explicitly instead. */
-  autosave?: boolean;
+  /**
+   * Persist handler. Given one, the editor saves on blur and after a PDF
+   * import; without one it only reports changes and the owner saves (that is
+   * how onboarding uses it, where saving happens on "Готово").
+   */
+  onSave?: (text: string) => Promise<void>;
   rows?: number;
 }
 
-export const CvEditor = ({ value, onChange, autosave = true, rows = 12 }: Props) => {
+export const CvEditor = ({ value, onChange, onSave, rows = 12 }: Props) => {
   const fileInput = useRef<HTMLInputElement>(null);
   const [parsing, setParsing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +37,7 @@ export const CvEditor = ({ value, onChange, autosave = true, rows = 12 }: Props)
       try {
         const text = await extractPdfText(file);
         onChange(text);
-        if (autosave) await saveSettings({ cvText: text });
+        if (onSave) await onSave(text);
         flashSaved(STRINGS.cv.pdfParsed);
       } catch (err) {
         console.warn('[cover-letter] не удалось разобрать PDF', err);
@@ -45,13 +48,13 @@ export const CvEditor = ({ value, onChange, autosave = true, rows = 12 }: Props)
         if (fileInput.current) fileInput.current.value = '';
       }
     },
-    [onChange, autosave, flashSaved],
+    [onChange, onSave, flashSaved],
   );
 
   const persist = useCallback(() => {
-    if (!autosave) return;
-    void saveSettings({ cvText: value }).then(() => flashSaved(STRINGS.common.saved));
-  }, [autosave, value, flashSaved]);
+    if (!onSave) return;
+    void onSave(value).then(() => flashSaved(STRINGS.common.saved));
+  }, [onSave, value, flashSaved]);
 
   return (
     <div className="stack-sm">

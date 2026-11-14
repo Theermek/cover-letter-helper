@@ -16,6 +16,7 @@ import { requestLogger } from './middleware/logging.js';
 import { requireToken } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errors.js';
 import { healthRouter } from './routes/health.js';
+import { profileRouter } from './modules/profile/routes.js';
 
 /**
  * A browser refuses a cross-origin response unless the server names the origin
@@ -59,6 +60,8 @@ export const createApp = (): express.Express => {
 
   // Everything registered after this line needs the token.
   app.use(requireToken);
+
+  app.use(profileRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
