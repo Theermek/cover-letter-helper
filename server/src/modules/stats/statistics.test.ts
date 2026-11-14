@@ -1,28 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { LOW_SAMPLE_THRESHOLD, TOP_N, computeMarketStats } from './statistics';
-import type { HardSkill, SoftSkill, VacancyRecord } from '../storage/types';
+import {
+  LOW_SAMPLE_THRESHOLD,
+  TOP_N,
+  computeMarketStats,
+  type VacancyForStats,
+} from './statistics.js';
+import type { HardSkillDto, SoftSkillDto } from '../../../../shared/dto/vacancy.js';
 
-let seq = 0;
+const vacancy = (
+  hardSkills: HardSkillDto[],
+  softSkills: SoftSkillDto[] = [],
+): VacancyForStats => ({ hardSkills, softSkills });
 
-const vacancy = (hardSkills: HardSkill[], softSkills: SoftSkill[] = []): VacancyRecord => {
-  seq += 1;
-  return {
-    id: `v${seq}`,
-    createdAt: seq,
-    updatedAt: seq,
-    sourceText: `вакансия ${seq}`,
-    textHash: `hash${seq}`,
-    company: null,
-    title: null,
-    grade: null,
-    workFormat: null,
-    hardSkills,
-    softSkills,
-    letter: '',
-  };
-};
-
-const hard = (name: string, context = name, required = true): HardSkill => ({
+const hard = (name: string, context = name, required = true): HardSkillDto => ({
   name,
   context,
   required,

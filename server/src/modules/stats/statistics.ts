@@ -1,6 +1,10 @@
 /**
  * Market statistics over saved vacancies (TASK §8).
  *
+ * Moved from the extension to the server unchanged, together with its tests
+ * (TASK2 §1.3). The tests are the guarantee the task asks for: the numbers the
+ * server reports are the same numbers the extension used to compute.
+ *
  * Pure code, no LLM call. The counting rules the task description left open are
  * fixed here:
  *  - a skill counts ONCE per vacancy, however many times the model listed it;
@@ -11,39 +15,32 @@
  *    from a newer dictionary.
  */
 
-import { normalizeHardSkills, normalizeSoftSkills } from './skillNormalize';
-import { SOFT_SKILL_LABELS, type SoftSkillCategory } from '../config/softSkills';
-import type { VacancyRecord } from '../storage/types';
+import { normalizeHardSkills, normalizeSoftSkills } from './skillNormalize.js';
+import {
+  SOFT_SKILL_LABELS,
+  type SoftSkillCategory,
+} from '../../../../shared/vocabulary.js';
+import type { HardSkillDto, SoftSkillDto } from '../../../../shared/dto/vacancy.js';
+import type { ContextStat, MarketStats, SkillStat } from '../../../../shared/dto/stats.js';
+
+/**
+ * Everything the counting needs, and nothing more. Taking a structural type
+ * rather than the full row keeps this file independent of the database: the
+ * same function serves a stored vacancy and one that only exists in memory.
+ */
+export interface VacancyForStats {
+  hardSkills: HardSkillDto[];
+  softSkills: SoftSkillDto[];
+}
 
 /** Below this many vacancies the UI warns that the sample is thin. */
 export const LOW_SAMPLE_THRESHOLD = 10;
 export const TOP_N = 10;
 const MAX_CONTEXTS = 3;
 
-export interface ContextStat {
-  text: string;
-  count: number;
-}
-
-export interface SkillStat {
-  /** Canonical skill name; for soft skills this is the taxonomy key. */
-  name: string;
-  /** Russian display label (soft skills); equals `name` for hard skills. */
-  label: string;
-  vacancyCount: number;
-  percent: number;
-  requiredCount: number;
-  /** Share of required mentions among vacancies that list this skill. */
-  requiredPercent: number;
-  topContexts: ContextStat[];
-}
-
-export interface MarketStats {
-  totalVacancies: number;
-  lowSample: boolean;
-  hard: SkillStat[];
-  soft: SkillStat[];
-}
+// The result shape lives in shared/, because the page that renders it has to
+// agree with the code that computes it.
+export type { ContextStat, MarketStats, SkillStat } from '../../../../shared/dto/stats.js';
 
 interface Accumulator {
   name: string;
@@ -93,7 +90,7 @@ const rank = (
     )
     .slice(0, TOP_N);
 
-export const computeMarketStats = (vacancies: readonly VacancyRecord[]): MarketStats => {
+export const computeMarketStats = (vacancies: readonly VacancyForStats[]): MarketStats => {
   const hard = new Map<string, Accumulator>();
   const soft = new Map<string, Accumulator>();
 

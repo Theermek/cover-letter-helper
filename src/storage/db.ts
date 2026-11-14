@@ -1,13 +1,14 @@
 /**
- * Vacancy storage in IndexedDB (TASK §7).
+ * The legacy local vacancy store (TASK §7, superseded by TASK2 §1.3).
  *
- * Deduplication is enforced by a unique index on `textHash`: generating a letter
- * for the same vacancy twice refreshes the existing record instead of adding a
- * second one, so repeat generations cannot skew the statistics.
+ * Vacancies live on the server now. Nothing writes here any more: this file is
+ * read-only history, kept so the data a user accumulated before the server
+ * existed can be handed to `POST /import` once, and cleared afterwards.
+ *
+ * It goes away entirely in the next slice, once the transfer is confirmed.
  */
 
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import { normalizeHardSkills, normalizeSoftSkills } from '../lib/skillNormalize';
 import type { VacancyRecord } from './types';
 
 const DB_NAME = 'cover-letter-helper';
@@ -35,40 +36,6 @@ const db = (): Promise<IDBPDatabase<VacancyDB>> => {
   return dbPromise;
 };
 
-export type NewVacancy = Omit<VacancyRecord, 'id' | 'createdAt' | 'updatedAt'>;
-
-const withNormalisedSkills = <T extends { hardSkills: VacancyRecord['hardSkills']; softSkills: VacancyRecord['softSkills'] }>(
-  record: T,
-): T => ({
-  ...record,
-  hardSkills: normalizeHardSkills(record.hardSkills),
-  softSkills: normalizeSoftSkills(record.softSkills),
-});
-
-/**
- * Inserts the vacancy, or refreshes the existing record with the same text hash.
- * Returns the stored record and whether it already existed.
- */
-export const upsertVacancy = async (
-  input: NewVacancy,
-): Promise<{ record: VacancyRecord; created: boolean }> => {
-  const database = await db();
-  const tx = database.transaction(STORE, 'readwrite');
-  const store = tx.objectStore(STORE);
-  const existing = await store.index('textHash').get(input.textHash);
-  const now = Date.now();
-
-  const record: VacancyRecord = withNormalisedSkills(
-    existing
-      ? { ...existing, ...input, id: existing.id, createdAt: existing.createdAt, updatedAt: now }
-      : { ...input, id: crypto.randomUUID(), createdAt: now, updatedAt: now },
-  );
-
-  await store.put(record);
-  await tx.done;
-  return { record, created: !existing };
-};
-
 /** Newest first. */
 export const listVacancies = async (): Promise<VacancyRecord[]> => {
   const database = await db();
@@ -78,54 +45,6 @@ export const listVacancies = async (): Promise<VacancyRecord[]> => {
 
 export const countVacancies = async (): Promise<number> => (await db()).count(STORE);
 
-export const getVacancy = async (id: string): Promise<VacancyRecord | undefined> =>
-  (await db()).get(STORE, id);
-
-export const deleteVacancy = async (id: string): Promise<void> => {
-  await (await db()).delete(STORE, id);
-};
-
 export const clearVacancies = async (): Promise<void> => {
   await (await db()).clear(STORE);
-};
-
-/**
- * Merges imported records, skipping any whose text hash is already present
- * (TASK §9). Returns how many were added and how many were skipped as dupes.
- */
-export const importVacancies = async (
-  records: readonly VacancyRecord[],
-): Promise<{ added: number; skipped: number }> => {
-  const database = await db();
-  const tx = database.transaction(STORE, 'readwrite');
-  const store = tx.objectStore(STORE);
-  const index = store.index('textHash');
-
-  let added = 0;
-  let skipped = 0;
-
-  for (const record of records) {
-    if (!record.textHash) {
-      skipped += 1;
-      continue;
-    }
-    if (await index.get(record.textHash)) {
-      skipped += 1;
-      continue;
-    }
-
-    // Re-key on import: an id from another profile may collide with a local one.
-    await store.put(
-      withNormalisedSkills({
-        ...record,
-        id: crypto.randomUUID(),
-        createdAt: record.createdAt || Date.now(),
-        updatedAt: Date.now(),
-      }),
-    );
-    added += 1;
-  }
-
-  await tx.done;
-  return { added, skipped };
 };

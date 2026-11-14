@@ -14,7 +14,7 @@ import { appendSignature, resolveSignature } from '../lib/signature';
 import { vacancyTextHash } from '../lib/hash';
 import { activeConfig, getSettings } from '../storage/settings';
 import { fetchProfile } from '../api/profile';
-import { getVacancy, upsertVacancy } from '../storage/db';
+import { patchVacancy, saveVacancy } from '../api/vacancies';
 import {
   getGenerationState,
   setGenerationState,
@@ -123,7 +123,9 @@ const run = async (input: GenerationInput): Promise<GenerationState> => {
     let vacancyId: string | null = null;
     let createdNew = false;
     try {
-      const saved = await upsertVacancy({
+      // The vacancy is stored on the server now (TASK2 §1.3); deduplication by
+      // text hash happens there, enforced by a unique index.
+      const saved = await saveVacancy({
         sourceText: vacancyText,
         textHash: await vacancyTextHash(vacancyText),
         company: parsed.vacancy.company,
@@ -134,10 +136,11 @@ const run = async (input: GenerationInput): Promise<GenerationState> => {
         softSkills: parsed.skills.soft,
         letter,
       });
-      vacancyId = saved.record.id;
+      vacancyId = saved.vacancy.id;
       createdNew = saved.created;
     } catch (error) {
-      // A storage failure must not cost the user their letter.
+      // A storage failure must not cost the user their letter: it is already in
+      // the generation state and on screen, only the archive entry is missing.
       console.warn('[cover-letter] не удалось сохранить вакансию', error);
     }
 
@@ -211,8 +214,12 @@ export const updateLetter = async (letter: string): Promise<void> => {
   const id = current.result.vacancyId;
   if (!id) return;
 
-  // Static import: dynamic import() is not available in an MV3 service worker.
-  const record = await getVacancy(id);
-  if (!record) return;
-  await upsertVacancy({ ...record, letter });
+  try {
+    // One PATCH with one field: the server keeps everything else as it is.
+    await patchVacancy(id, { letter });
+  } catch (error) {
+    // The edit is already saved in the generation state, so the user does not
+    // lose it; only the stored copy is behind.
+    console.warn('[cover-letter] не удалось сохранить правку письма', error);
+  }
 };

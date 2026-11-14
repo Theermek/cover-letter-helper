@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeHardSkills, normalizeSoftSkills } from './skillNormalize';
-import { canonicalSkillName } from '../config/skillAliases';
+import { normalizeHardSkills, normalizeSoftSkills } from './skillNormalize.js';
+import { canonicalSkillName } from './skillAliases.js';
 
 describe('canonicalSkillName', () => {
   it('maps known aliases onto the canonical spelling', () => {

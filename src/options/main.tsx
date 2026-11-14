@@ -9,8 +9,15 @@ import {
   LETTER_LANGUAGES,
   LETTER_LENGTHS,
 } from '../config/lengths';
-import { deleteAllData, downloadExport, importFromFile } from '../lib/exportImport';
+import {
+  deleteBrowserData,
+  downloadExport,
+  importFromFile,
+  migrateLocalDataToServer,
+} from '../lib/exportImport';
+import { countVacancies } from '../storage/db';
 import { saveSettings } from '../storage/settings';
+import { isAppErrorShape } from '../lib/errors';
 import { useFlash, useProfile, useSettings } from '../ui/hooks';
 import { ServerForm } from '../ui/components/ServerForm';
 import { ProviderForm } from '../ui/components/ProviderForm';
@@ -36,16 +43,19 @@ const Options = () => {
   const [notice, flashNotice] = useFlash(4000);
   const [error, setError] = useState<string | null>(null);
   const importInput = useRef<HTMLInputElement>(null);
+  const [migrating, setMigrating] = useState(false);
 
   const handleImport = useCallback(
     async (file: File | undefined) => {
       if (!file) return;
       setError(null);
       try {
-        const { added, skipped } = await importFromFile(file);
-        flashNotice(STRINGS.options.importResult(added, skipped));
-      } catch {
-        setError(STRINGS.options.importError);
+        const { imported, skipped } = await importFromFile(file);
+        flashNotice(STRINGS.options.importResult(imported, skipped));
+      } catch (caught) {
+        // A rejected request has a message worth showing; a malformed file does
+        // not, so the generic "this is not an export file" stays for that case.
+        setError(isAppErrorShape(caught) ? caught.message : STRINGS.options.importError);
       } finally {
         if (importInput.current) importInput.current.value = '';
       }
@@ -53,9 +63,31 @@ const Options = () => {
     [flashNotice],
   );
 
+  /**
+   * The one-time transfer of data left in the browser from before the server.
+   * Safe to press twice: the server deduplicates by text hash and never
+   * overwrites a profile field that already has a value.
+   */
+  const handleMigrate = useCallback(async () => {
+    setError(null);
+    setMigrating(true);
+    try {
+      if ((await countVacancies()) === 0) {
+        flashNotice(STRINGS.options.migrateEmpty);
+        return;
+      }
+      const { imported, skipped } = await migrateLocalDataToServer();
+      flashNotice(STRINGS.options.migrateDone(imported, skipped));
+    } catch (caught) {
+      setError(isAppErrorShape(caught) ? caught.message : STRINGS.server.failed);
+    } finally {
+      setMigrating(false);
+    }
+  }, [flashNotice]);
+
   const handleDeleteAll = useCallback(async () => {
     if (!confirm(STRINGS.options.confirmDeleteAll)) return;
-    await deleteAllData();
+    await deleteBrowserData();
     setCvText(null);
     reload();
     flashNotice(STRINGS.options.deletedAll);
@@ -168,6 +200,17 @@ const Options = () => {
       <section className="card stack">
         <h2>{STRINGS.options.dataSection}</h2>
         <div className="row">
+          <button
+            type="button"
+            className="primary"
+            disabled={migrating}
+            onClick={() => void handleMigrate()}
+          >
+            {migrating ? STRINGS.options.migrating : STRINGS.options.migrate}
+          </button>
+        </div>
+        <p className="hint">{STRINGS.options.migrateHint}</p>
+        <div className="row">
           <button type="button" onClick={() => void downloadExport()}>
             {STRINGS.options.export}
           </button>
@@ -187,6 +230,7 @@ const Options = () => {
           </button>
         </div>
         <p className="hint">{STRINGS.options.exportNote}</p>
+        <p className="hint">{STRINGS.options.deleteAllHint}</p>
         {notice && <p className="success">{notice}</p>}
         {error && <p className="error">{error}</p>}
         <div className="row">

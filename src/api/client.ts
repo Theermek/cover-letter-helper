@@ -38,7 +38,20 @@ const errorMessageFrom = async (response: Response): Promise<string | undefined>
   return undefined;
 };
 
-export const apiRequest = async <T>(path: string, options: RequestOptions = {}): Promise<T> => {
+/**
+ * The status code matters in one place: POST /vacancies answers 201 for a new
+ * vacancy and 200 for a refreshed one, which is how the popup knows whether to
+ * say "saved" or "updated". Everything else only wants the body.
+ */
+export interface ApiResponse<T> {
+  data: T;
+  status: number;
+}
+
+export const apiRequestWithStatus = async <T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<ApiResponse<T>> => {
   const settings = await getSettings();
   const base = settings.server.url.trim();
 
@@ -89,14 +102,17 @@ export const apiRequest = async <T>(path: string, options: RequestOptions = {}):
     );
   }
 
-  if (response.status === 204) return undefined as T;
+  if (response.status === 204) return { data: undefined as T, status: response.status };
 
   try {
-    return (await response.json()) as T;
+    return { data: (await response.json()) as T, status: response.status };
   } catch (error) {
     throw appError('bad_response', error instanceof Error ? error.message : 'invalid json');
   }
 };
+
+export const apiRequest = async <T>(path: string, options: RequestOptions = {}): Promise<T> =>
+  (await apiRequestWithStatus<T>(path, options)).data;
 
 /**
  * Liveness check for the "test connection" button. Deliberately without a

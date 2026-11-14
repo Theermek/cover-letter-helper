@@ -17,13 +17,24 @@
 import { z } from 'zod';
 import { SOFT_SKILL_CATEGORIES } from '../config/softSkills';
 
-export const GRADES = ['junior', 'middle', 'senior', 'lead'] as const;
-export const WORK_FORMATS = ['remote', 'office', 'hybrid'] as const;
-export const REQUIREMENT_MODES = ['include_phrase', 'only_phrase', 'none'] as const;
-
-export type Grade = (typeof GRADES)[number];
-export type WorkFormat = (typeof WORK_FORMATS)[number];
-export type RequirementMode = (typeof REQUIREMENT_MODES)[number];
+// The vocabularies live in shared/ so that the server, which stores and counts
+// these values, and the model schema, which produces them, cannot drift apart.
+export {
+  GRADES,
+  WORK_FORMATS,
+  REQUIREMENT_MODES,
+  type Grade,
+  type WorkFormat,
+  type RequirementMode,
+} from '../../shared/vocabulary';
+import {
+  GRADES,
+  REQUIREMENT_MODES,
+  WORK_FORMATS,
+  type Grade,
+  type RequirementMode,
+  type WorkFormat,
+} from '../../shared/vocabulary';
 
 const HardSkill = z.object({
   name: z.string(),

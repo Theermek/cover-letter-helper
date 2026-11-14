@@ -11,8 +11,8 @@
  * weigh three times as much.
  */
 
-import { canonicalSkillName } from '../config/skillAliases';
-import type { HardSkill, SoftSkill } from '../storage/types';
+import { canonicalSkillName } from './skillAliases.js';
+import type { HardSkillDto, SoftSkillDto } from '../../../../shared/dto/vacancy.js';
 
 interface SkillLike {
   name: string;
@@ -47,7 +47,7 @@ const dedupe = <T extends SkillLike>(skills: readonly T[]): T[] => {
 };
 
 /** Canonicalises hard-skill names and collapses duplicates within one vacancy. */
-export const normalizeHardSkills = (skills: readonly HardSkill[]): HardSkill[] =>
+export const normalizeHardSkills = (skills: readonly HardSkillDto[]): HardSkillDto[] =>
   dedupe(
     skills.map((skill) => ({
       ...skill,
@@ -57,5 +57,5 @@ export const normalizeHardSkills = (skills: readonly HardSkill[]): HardSkill[] =
   );
 
 /** Soft skills already come from a fixed taxonomy; only duplicates need work. */
-export const normalizeSoftSkills = (skills: readonly SoftSkill[]): SoftSkill[] =>
+export const normalizeSoftSkills = (skills: readonly SoftSkillDto[]): SoftSkillDto[] =>
   dedupe(skills.map((skill) => ({ ...skill, context: skill.context.trim() })));

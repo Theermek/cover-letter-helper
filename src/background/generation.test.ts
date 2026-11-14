@@ -5,10 +5,9 @@
  * sanitizer.
  */
 
-import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { installChromeStub } from '../ui/testing/chromeStub';
-import { installFetchStub } from '../api/testing/fetchStub';
+import { installFetchStub, type FetchStub } from '../api/testing/fetchStub';
 import { appError } from '../lib/errors';
 import type { ParsedResponse } from '../schema/response';
 import type { GenerationInput } from '../storage/generation';
@@ -59,12 +58,12 @@ const input = (over: Partial<GenerationInput> = {}): GenerationInput => ({
   ...over,
 });
 
-beforeEach(async () => {
+let server: FetchStub;
+
+beforeEach(() => {
   vi.clearAllMocks();
   installChromeStub({ settings });
-  installFetchStub(profile);
-  const { clearVacancies } = await import('../storage/db');
-  await clearVacancies();
+  server = installFetchStub(profile);
 });
 
 describe('startGeneration', () => {
@@ -82,14 +81,49 @@ describe('startGeneration', () => {
     expect(state.result?.vacancyId).toBeTruthy();
   });
 
-  it('canonicalises skills on the saved record', async () => {
+  it('sends the vacancy to the server with the analysis as the model gave it', async () => {
     generate.mockResolvedValue(response());
     const { startGeneration } = await import('./generation');
-    const { listVacancies } = await import('../storage/db');
 
     await startGeneration(input());
 
-    expect((await listVacancies())[0]?.hardSkills[0]?.name).toBe('React');
+    const save = server.calls.find((c) => c.method === 'POST' && c.url.endsWith('/vacancies'));
+    expect(save?.body).toMatchObject({
+      sourceText: 'Ищем React-разработчика',
+      company: 'Acme',
+      title: 'Frontend',
+      // Not canonicalised here on purpose: normalisation lives on the server
+      // with the statistics, so one dictionary serves old and new records alike.
+      hardSkills: [{ name: 'ReactJS', context: 'React + Next.js', required: true }],
+    });
+    expect(save?.body).toHaveProperty('textHash');
+  });
+
+  it('sends an edited letter as a one-field PATCH', async () => {
+    generate.mockResolvedValue(response());
+    const { startGeneration, updateLetter } = await import('./generation');
+
+    const state = await startGeneration(input());
+    await updateLetter('письмо, поправленное руками');
+
+    const patch = server.calls.find((c) => c.method === 'PATCH');
+    expect(patch?.url).toContain(`/vacancies/${state.result?.vacancyId}`);
+    expect(patch?.body).toEqual({ letter: 'письмо, поправленное руками' });
+  });
+
+  it('keeps the letter even when the server refuses to store the vacancy', async () => {
+    generate.mockResolvedValue(response({ letter: 'Здравствуйте! Делал админки на React.' }));
+    const { startGeneration } = await import('./generation');
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    // The archive is a side effect; losing it must not cost the user the letter
+    // they just waited for.
+    server.vacancies = { set: () => { throw new Error('db down'); } } as never;
+    const state = await startGeneration(input());
+
+    expect(state.status).toBe('done');
+    expect(state.result?.letter).toBe('Здравствуйте! Делал админки на React.');
+    expect(state.result?.vacancyId).toBeNull();
   });
 
   it('returns exactly the code word in only_phrase mode, whatever the length', async () => {

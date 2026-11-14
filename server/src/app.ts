@@ -17,6 +17,8 @@ import { requireToken } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errors.js';
 import { healthRouter } from './routes/health.js';
 import { profileRouter } from './modules/profile/routes.js';
+import { vacancyRouter } from './modules/vacancies/routes.js';
+import { importRouter } from './modules/import/routes.js';
 
 /**
  * A browser refuses a cross-origin response unless the server names the origin
@@ -54,7 +56,9 @@ export const createApp = (): express.Express => {
   app.use(requestLogger);
   app.use(cors({ origin: corsOrigin, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] }));
   // The CV and a vacancy text are long; the default 100kb limit is too tight.
-  app.use(express.json({ limit: '2mb' }));
+  // An import file carries the full text of every saved vacancy, so the ceiling
+  // has to be generous -- it is also what stops a huge body exhausting memory.
+  app.use(express.json({ limit: '20mb' }));
 
   app.use(healthRouter);
 
@@ -62,6 +66,8 @@ export const createApp = (): express.Express => {
   app.use(requireToken);
 
   app.use(profileRouter);
+  app.use(vacancyRouter);
+  app.use(importRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
