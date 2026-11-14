@@ -1,0 +1,32 @@
+# Локальное окружение для разработки.
+#
+# Поднимает только базу: сервер на время разработки запускается командой
+# `npm run dev` в папке server/, чтобы правки применялись мгновенно.
+# Образ pgvector/pgvector - это обычный Postgres, в который уже встроено
+# расширение vector: оно понадобится на этапе 2 для поиска по смыслу.
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: clh-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-clh}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clh_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-cover_letter_helper}
+    ports:
+      # Снаружи 5433, чтобы не конфликтовать с Postgres, который может быть
+      # установлен в системе на стандартном 5432.
+      - '5433:5432'
+    volumes:
+      - clh_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Пока проверка не прошла, контейнер считается не готовым: это нужно,
+      # чтобы миграции не стартовали в базу, которая ещё поднимается.
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-clh} -d ${POSTGRES_DB:-cover_letter_helper}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  clh_pgdata:

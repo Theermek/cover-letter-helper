@@ -7,3 +7,9 @@ dist/
 # Личное техзадание, не для публикации
 TASK.md
 TASK2.md
+
+# Секреты сервера: в репозитории только .env.example
+.env
+.env.local
+server/.env
+server/.env.local
